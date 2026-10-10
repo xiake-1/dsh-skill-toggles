@@ -15,6 +15,21 @@ dsh plugin --profile desktop add file:D:/Work/Deepseek/dsh-Plugins/dsh-skill-tog
 
 安装后重启 DSH（或重载 profile）。浏览器半需要页面重新加载才会注入。
 
+## 卸载
+
+```
+dsh plugin --profile desktop remove dsh-skill-toggles
+```
+
+包内 `postuninstall`（`scripts/cleanup.mjs`）会删除状态目录；若该生命周期脚本未被包管理器执行，手动删除即可：
+
+```
+# Windows PowerShell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.dsh\dsh-skill-toggles"
+```
+
+卸载后影子 provider 随插件 fiber 释放自动注销，全部技能恢复默认可用。
+
 ## 生效语义
 
 | 路径 | 生效时机 |
