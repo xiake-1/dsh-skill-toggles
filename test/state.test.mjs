@@ -10,6 +10,8 @@ import { join } from 'node:path';
 
 import {
   DEFAULT_GROUP_ID,
+  SHADOW_LOCATOR_PREFIX,
+  classifyOrigin,
   effectiveDisabled,
   effectiveDisabledList,
   mergeCatalog,
@@ -24,6 +26,7 @@ import {
   withGroupCreated,
   withGroupDeleted,
   withGroupRenamed,
+  withGroupSet,
 } from '../lib/state.js';
 import { createStateStore, resolveStateDir } from '../lib/store.js';
 
@@ -184,6 +187,48 @@ test('snapshotState returns an independent deep copy', () => {
   snap.activeGroups.push('zz');
   assert.deepEqual(state.groups[1].disabled, ['x']);
   assert.deepEqual(state.activeGroups, [DEFAULT_GROUP_ID, 'a']);
+});
+
+test('withGroupSet: bulk add/remove inside one group, set-wise idempotent', () => {
+  const base = normalizeState(undefined);
+  const added = withGroupSet(base, DEFAULT_GROUP_ID, ['a', 'b', 'a'], true);
+  assert.deepEqual(added.groups[0].disabled, ['a', 'b']);
+  assert.equal(withGroupSet(added, DEFAULT_GROUP_ID, ['b', 'a'], true), added, 'same set → same object');
+  const removed = withGroupSet(added, DEFAULT_GROUP_ID, ['a'], false);
+  assert.deepEqual(removed.groups[0].disabled, ['b']);
+  assert.equal(withGroupSet(removed, DEFAULT_GROUP_ID, ['ghost'], false), removed);
+  assert.throws(() => withGroupSet(base, 'ghost', ['x'], true), /unknown group/);
+});
+
+test('classifyOrigin: plugin paths, resourceBase, named providers, user/project/custom', () => {
+  const opts = { dshHome: 'C:/Users/u/.dsh', agentsHome: 'C:/Users/u/.agents', shadowProvider: 'skill-toggles-filter' };
+  assert.equal(classifyOrigin({ path: 'C:/p/node_modules/dsh-ppt/skills/ppt/SKILL.md', provider: 'filesystem' }, opts), 'plugin:dsh-ppt');
+  assert.equal(classifyOrigin({ path: 'C:/p/node_modules/@scope/pkg/skills/x.md', provider: 'filesystem' }, opts), 'plugin:@scope/pkg');
+  // Runtime-registered plugin skills: generic provider "runtime", attributed via resourceBase.
+  assert.equal(classifyOrigin({ provider: 'runtime', resourceBase: { kind: 'directory', path: 'C:/p/node_modules/dsh-project-plan-docs/skills/plan/' } }, opts), 'plugin:dsh-project-plan-docs');
+  assert.equal(classifyOrigin({ provider: 'dsh-badge' }, opts), 'plugin:dsh-badge');
+  // Shadow-won entry keeps path/resourceBase → classifies like the enabled form.
+  assert.equal(classifyOrigin({
+    provider: 'skill-toggles-filter',
+    resourceBase: { kind: 'directory', path: 'C:/p/node_modules/dsh-unity-mcp-bridge/skills/install/' },
+  }, opts), 'plugin:dsh-unity-mcp-bridge');
+  assert.equal(classifyOrigin({ provider: 'skill-toggles-filter', path: 'C:/Users/u/.dsh/skills/my/SKILL.md' }, opts), 'user');
+  assert.equal(classifyOrigin({ path: 'C:/Users/u/.dsh/skills/my/SKILL.md', provider: 'filesystem' }, opts), 'user');
+  assert.equal(classifyOrigin({ path: 'C:/Users/u/.agents/skills/x.md', provider: 'filesystem' }, opts), 'user');
+  assert.equal(classifyOrigin({ path: 'D:/proj/.dsh/skills/x/SKILL.md', provider: 'filesystem' }, opts), 'project');
+  assert.equal(classifyOrigin({ path: 'D:/proj/.agents/skills/x.md', provider: 'filesystem' }, opts), 'project');
+  assert.equal(classifyOrigin({ path: 'D:/extra/skills/x.md', provider: 'filesystem' }, opts), 'custom');
+  assert.equal(classifyOrigin({ provider: 'filesystem' }, opts), 'other');
+  assert.equal(classifyOrigin({}, opts), 'other');
+});
+
+test('mergeCatalog: rows carry the origin key', () => {
+  const rows = mergeCatalog(
+    [{ name: 'a', description: '', invocation: {}, origin: 'plugin:dsh-ppt' }, { name: 'b', description: '', invocation: {} }],
+    normalizeState(undefined),
+  );
+  assert.equal(rows[0].origin, 'plugin:dsh-ppt');
+  assert.equal(rows[1].origin, 'other');
 });
 
 test('store: missing file loads the default group; update persists v2; corrupt falls back; v1 migrates', async () => {

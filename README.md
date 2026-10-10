@@ -4,8 +4,9 @@ DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**的 skill 启�
 
 - 默认语义：**默认全放行**。所有技能默认可用，仅被"启用中的分组"显式关闭的才被过滤；全新安装、状态文件缺失或损坏都等于"全部启用"，永不出现"装上即全消失"。
 - 分组（v0.2.0）：内置**默认分组**（初始全开，可编辑、不可删除）；可创建任意自定义分组，每组维护自己的黑名单与"启用/停用"开关。**生效黑名单 = 所有启用分组黑名单的并集**；切换分组启用状态即整组生效/失效。
-- UI：聊天输入框工具条按钮（"技能"，`conversation.input.left`）+ 左侧悬浮面板（分组管理：启用开关/选择编辑/重命名/新建/删除；技能列表 + 开关 + 搜索 + 清空该组 + 全部启用）。
-- Agent 工具：`skill_toggles_list` / `skill_toggles_disable` / `skill_toggles_enable` / `skill_toggles_enable_all`（均带可选 `group` 参数，缺省为默认分组）+ `skill_toggles_group_create` / `skill_toggles_group_delete` / `skill_toggles_group_set_active`。
+- UI：聊天输入框工具条按钮（"技能"，`conversation.input.left`）+ 左侧悬浮面板（分组管理：启用开关/选择编辑/重命名/新建/删除；技能列表 + 开关 + 搜索 + 清空该组 + 全部启用 + **全部禁用**（作用于当前选中分组））。
+- 来源分组（v0.3.0）：技能列表按**来源分节**——`插件 <包名>`（按 path/resourceBase 落在 `node_modules/<pkg>` 判定，或独立命名 provider）、用户技能（`~/.dsh/skills`、`~/.agents/skills`）、项目技能（`<项目>/.dsh|.agents/skills`）、自定义目录、其他（DSH 内置运行时注册技能无路径指纹，归入此类）。每节有**折叠按钮**（状态持久化）与**全部禁用/全部启用**批量按钮（作用于当前选中分组）。
+- Agent 工具：`skill_toggles_list` / `skill_toggles_disable` / `skill_toggles_enable` / `skill_toggles_enable_all` / `skill_toggles_disable_all` / `skill_toggles_source_set`（均带可选 `group` 参数，缺省为默认分组；list 行含 `origin` 来源键）+ `skill_toggles_group_create` / `skill_toggles_group_delete` / `skill_toggles_group_set_active`。
 - 只管 skills，不做 MCP 开关。
 
 ## 安装
@@ -55,7 +56,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.dsh\dsh-skill-toggles"
 
 dsh-hmr 默认不监视已安装包的源码；**重装/升级已安装 bundle 后宿主半需要重启进程才换代码**（Node 模块缓存按解析结果缓存，bundle 重挂载不会重新 import）。浏览器半无此问题（每次页面加载重新拉取）。
 
-本次 0.1.0→0.2.0 热替换采用的临时手段（仅存在于已安装副本，源码树无此内容）：安装目录内新增 `lib/index.v2.js`/`state.v2.js`/`store.v2.js` 重命名副本，`package.json` 的 `.` 导出与 `main` 指向 `index.v2.js`，`cordis.patch.yml` 行 `name` 改为该文件的绝对路径（新 specifier 强制重新解析）。下次从源码干净重装（remove + install）即恢复标准布局；重启进程后两种方式都走标准解析。
+本次 0.1.0→0.2.x→0.3.0 热替换采用的临时手段（仅存在于已安装副本，源码树无此内容）：安装目录内新增 `lib/index.v4.js`/`state.v4.js`/`store.v4.js` 重命名副本（相对 import 改写为 `.v4`），`cordis.patch.yml` 行 `name` 指向 `index.v4.js` 的绝对路径（新 specifier 强制重新解析；子路径导出如 `dsh-skill-toggles/v2` 不被 loader 解析，必须绝对路径）。下次从源码干净重装（remove + install）即恢复标准布局；重启进程后两种方式都走标准解析。
 
 ## 开发
 
@@ -67,7 +68,7 @@ node test/state.test.mjs   # 纯逻辑 + 存储往返测试（沙箱内 node --t
 
 ```
 dsh-skill-toggles/
-├── lib/index.js      宿主半（影子 provider、RPC、7 个工具、事件广播）
+├── lib/index.js      宿主半（影子 provider、RPC、9 个工具、事件广播）
 ├── lib/client.js     浏览器半（输入框按钮 + 分组管理悬浮面板）
 ├── lib/state.js      纯状态逻辑（分组黑名单语义 + v1 迁移，单测覆盖）
 ├── lib/store.js      原子写状态存储
