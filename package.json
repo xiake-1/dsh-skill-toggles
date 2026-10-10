@@ -1,6 +1,6 @@
 {
   "name": "dsh-skill-toggles",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DeepSeek Harness skill toggles: blacklist-semantics skill on/off switches with group profiles, a composer button + floating panel, per-agent shadow skill provider, and instant composer '/' menu refresh",
   "type": "module",
   "main": "lib/index.js",
