@@ -1,0 +1,8 @@
+# dsh-skill-toggles bundle patch: mounts the toggle manager into the host
+# composition of a dsh profile. The plugin registers skill_toggles_* tools
+# into the shared tools registry and a per-agent shadow skill provider that
+# suppresses explicitly disabled skills (blacklist: everything else passes).
+- insert:
+    - id: skill-toggles
+      name: 'dsh-skill-toggles'
+      config: {}
