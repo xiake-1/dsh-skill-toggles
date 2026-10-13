@@ -1,79 +1,67 @@
 # dsh-skill-toggles
 
-DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**的 skill 启用/禁用管理。
+DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**——所有技能默认可用，只有被"启用中的分组"显式禁用的才被过滤（生效黑名单 = 启用分组黑名单的并集）。全新安装、状态文件缺失或损坏都等于"全部启用"，永不出现"装上即全消失"。
 
-- 默认语义：**默认全放行**。所有技能默认可用，仅被"启用中的分组"显式关闭的才被过滤；全新安装、状态文件缺失或损坏都等于"全部启用"，永不出现"装上即全消失"。
-- 分组（v0.2.0）：内置**默认分组**（初始全开，可编辑、不可删除）；可创建任意自定义分组，每组维护自己的黑名单与"启用/停用"开关。**生效黑名单 = 所有启用分组黑名单的并集**；切换分组启用状态即整组生效/失效。
-- UI：聊天输入框工具条按钮（"技能"，`conversation.input.left`）+ 左侧悬浮面板（分组管理：启用开关/选择编辑/重命名/新建/删除；技能列表 + 开关 + 搜索 + 清空该组 + 全部启用 + **全部禁用**（作用于当前选中分组））。
-- 来源分组（v0.3.0）：技能列表按**来源分节**——`插件 <包名>`（按 path/resourceBase 落在 `node_modules/<pkg>` 判定，或独立命名 provider）、用户技能（`~/.dsh/skills`、`~/.agents/skills`）、项目技能（`<项目>/.dsh|.agents/skills`）、自定义目录、其他（DSH 内置运行时注册技能无路径指纹，归入此类）。每节有**折叠按钮**（状态持久化）与**全部禁用/全部启用**批量按钮（作用于当前选中分组）。
-- Agent 工具：`skill_toggles_list` / `skill_toggles_disable` / `skill_toggles_enable` / `skill_toggles_enable_all` / `skill_toggles_disable_all` / `skill_toggles_source_set`（均带可选 `group` 参数，缺省为默认分组；list 行含 `origin` 来源键）+ `skill_toggles_group_create` / `skill_toggles_group_delete` / `skill_toggles_group_set_active`。
-- 只管 skills，不做 MCP 开关。
+![技能面板](assets/screenshots/panel.png)
 
 ## 安装
 
-```
-dsh plugin --profile desktop add file:D:/Work/Deepseek/dsh-Plugins/dsh-skill-toggles
-```
+- **插件市场**：在 dshmarket 中搜索 `dsh-skill-toggles`，一键安装；
+- **npm**：
+  ```
+  dsh plugin --profile desktop add dsh-skill-toggles
+  ```
+- **本地源码**：
+  ```
+  dsh plugin --profile desktop add file:<本仓库绝对路径>
+  ```
 
-安装后重启 DSH（或重载 profile）。浏览器半需要页面重新加载（F5）才会注入。
+安装后重启 DSH（浏览器半重新加载页面即可）。卸载：`dsh plugin --profile desktop remove dsh-skill-toggles`（`postuninstall` 自动删除状态目录 `<DSH_HOME>/dsh-skill-toggles/`）。
 
-## 卸载
+## 使用
 
-```
-dsh plugin --profile desktop remove dsh-skill-toggles
-```
+![分组管理](assets/screenshots/groups.png)
 
-包内 `postuninstall`（`scripts/cleanup.mjs`）会删除状态目录；若该生命周期脚本未被包管理器执行，手动删除即可：
+1. **打开面板**：聊天输入框工具条的「技能」按钮 → 左侧悬浮面板。
+2. **分组**：内置默认分组（初始全开、可编辑、不可删除）；可新建/重命名/删除自定义分组，每组有自己的黑名单与启用开关——切换启用状态即整组生效/失效。
+3. **技能列表**：每行开关作用于当前选中分组；支持搜索、按**来源分节**（插件包 / 用户 / 项目 / 自定义 / 其他，可折叠）与每节"全部禁用/全部启用"。技能被其它启用分组禁用时显示"被「××」禁用"徽标。
+4. **Agent 工具**：`skill_toggles_list / disable / enable / enable_all / disable_all / source_set / group_create / group_delete / group_set_active`（均带可选 `group` 参数，缺省为默认分组）。
+5. **改动生效时机**：
 
-```
-# Windows PowerShell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.dsh\dsh-skill-toggles"
-```
+   | 路径 | 生效时机 |
+   |---|---|
+   | 输入框 `/` 技能菜单 | 下一次打开菜单（亚秒级） |
+   | 模型 `<available_skills>` 目录 | 下一条消息（宿主"持久投影"机制，任何插件都如此） |
+   | `skill` 工具 | 立即拒绝被禁用的技能 |
 
-卸载后影子 provider 随插件 fiber 释放自动注销，全部技能恢复默认可用。
+只管 skills，不做 MCP 开关。
 
-## 生效语义
+## 已知限制
 
-| 路径 | 生效时机 |
-|---|---|
-| 输入框 `/` 技能菜单 | **下一次打开菜单即生效**（任何切换/分组变更后宿主向所有活动会话广播 `agent-preset/selected` 使客户端目录缓存失效，下一次 `/` 重新拉取，亚秒级） |
-| 模型 `<available_skills>` 目录 | **下一条消息生效**（宿主机制为"持久投影"，对话中途不能热替换模型已见的目录，任何插件都如此） |
-| `skill` 工具 | 立即拒绝被禁用的技能（`isModelInvocable` 门） |
+- Agent 未激活的冷会话由 preset 常驻 scope 供数，其 `/` 菜单可能仍显示已禁用技能，直到会话被激活（模型目录与 `skill` 工具不受影响）。
+- 与旧插件 `dsh-skills-mcp-group-manager` **互斥**（两个影子 provider 叠加语义不可控），启动时检测到会打警告。
+- 重装/升级**已安装** bundle 后，宿主半需要重启进程才换代码（Node 模块缓存）；浏览器半无此问题。
 
-面板中每行的开关作用于**当前选中的分组**；若某技能被其它启用分组禁用（本组开着），行上会显示"被「××」禁用"徽标；若本组禁用了它但本组未启用，显示"本组未启用"。
+## 实现要点（维护者）
 
-已知限制：Agent 未激活的冷会话由 preset 常驻 scope 供数，本插件的影子 provider 不覆盖该 scope，其 `/` 菜单可能仍显示已禁用技能，直到会话被激活（模型目录与 `skill` 工具不受影响，它们总是经过活动 Agent）。
-
-## 实现要点
-
-- 状态（v2）：`<DSH_HOME>/dsh-skill-toggles/state.json`，形如 `{ version:2, groups:[{id,name,disabled[]}], activeGroups[] }`；v1 扁平 `{disabled[]}` 文档加载时自动迁移进默认分组。原子写；损坏回退为"全部启用"；卸载时 `postuninstall` 删除该目录。
-- 过滤机制：per-agent 影子 skill provider（`skill-toggles-filter`，注册在 agent 层）。`list()` 只发射"**生效**黑名单（启用分组并集）∧ 真实存在"的条目，invocation 改写为 `{modelInvocable:false, userInvocable:false}`，`rank:0` 在同层内直接胜出（文件系统根 rank 100..500）；最近层胜出保证 agent 层技能（user-dsh/project）同样被过滤。启用的技能不重发，保留原 provider 的 `path` 预览与正文加载。
-- 变更后 `control.invalidate()` 清空 skill registry 的 collect 缓存（同时派发宿主本地 `skills/change`），再对每个活动会话 `ctx.emit('agent-preset/selected', sessionId, preset)` 使浏览器半缓存失效。
+- 状态（v2）：`<DSH_HOME>/dsh-skill-toggles/state.json`，形如 `{ version:2, groups:[{id,name,disabled[]}], activeGroups[] }`；原子写；损坏回退为"全部启用"；v1 扁平文档加载时自动迁移进默认分组。
+- 过滤机制：per-agent 影子 skill provider（`skill-toggles-filter`，注册在 agent 层）。`list()` 只发射"生效黑名单 ∧ 真实存在"的条目，invocation 改写为 `{modelInvocable:false, userInvocable:false}`，`rank:0` 在同层内直接胜出（文件系统根 rank 100..500）；启用的技能不重发，保留原 provider 的 `path` 预览与正文加载。
+- 变更后 `control.invalidate()` 清空 skill registry 的 collect 缓存，再对每个活动会话 `emit('agent-preset/selected')` 使浏览器半目录缓存失效。
 - 宿主半 `apply()` 保持同步（Cordis 对 prototype-bearing 函数的处理决定，异步 apply 会导致进程崩溃）。
-- 与旧插件 `dsh-skills-mcp-group-manager` **互斥**（两个影子 provider 叠加语义不可控）；启动时检测到旧插件会打警告，不会自动卸载对方。
-
-## 升级注意（宿主半热替换）
-
-dsh-hmr 默认不监视已安装包的源码；**重装/升级已安装 bundle 后宿主半需要重启进程才换代码**（Node 模块缓存按解析结果缓存，bundle 重挂载不会重新 import）。浏览器半无此问题（每次页面加载重新拉取）。
-
-本次 0.1.0→0.2.x→0.3.0 热替换采用的临时手段（仅存在于已安装副本，源码树无此内容）：安装目录内新增 `lib/index.v4.js`/`state.v4.js`/`store.v4.js` 重命名副本（相对 import 改写为 `.v4`），`cordis.patch.yml` 行 `name` 指向 `index.v4.js` 的绝对路径（新 specifier 强制重新解析；子路径导出如 `dsh-skill-toggles/v2` 不被 loader 解析，必须绝对路径）。下次从源码干净重装（remove + install）即恢复标准布局；重启进程后两种方式都走标准解析。
 
 ## 开发
 
 ```
-node test/state.test.mjs   # 纯逻辑 + 存储往返测试（沙箱内 node --test 会 EPERM）
+node test/state.test.mjs   # 纯逻辑 + 存储往返测试
 ```
-
-结构：
 
 ```
 dsh-skill-toggles/
-├── lib/index.js      宿主半（影子 provider、RPC、9 个工具、事件广播）
-├── lib/client.js     浏览器半（输入框按钮 + 分组管理悬浮面板）
-├── lib/state.js      纯状态逻辑（分组黑名单语义 + v1 迁移，单测覆盖）
-├── lib/store.js      原子写状态存储
-├── scripts/cleanup.mjs  postuninstall 清理
-├── cordis.patch.yml  安装到 profile 的配置补丁片段
-├── test/state.test.mjs
-└── _verify/          宿主调研用一次性脚本（不发布）
+├── lib/index.js        宿主半（影子 provider、RPC、9 个工具、事件广播）
+├── lib/client.js       浏览器半（输入框按钮 + 分组管理悬浮面板）
+├── lib/state.js        纯状态逻辑（分组黑名单语义 + v1 迁移，单测覆盖）
+├── lib/store.js        原子写状态存储
+├── scripts/cleanup.mjs postuninstall 清理
+├── cordis.patch.yml    安装到 profile 的配置补丁片段
+└── test/state.test.mjs
 ```
