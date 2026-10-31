@@ -3,7 +3,7 @@
  *
  * Runs as the package's `postuninstall` lifecycle script (pnpm executes it
  * when `dsh plugin --profile <p> remove dsh-skill-toggles` removes the
- * package), so the plugin's persisted blacklist is removed together with the
+ * package), so the plugin's persisted state is removed together with the
  * plugin.
  *
  * Deletes the whole plugin-owned state directory:
