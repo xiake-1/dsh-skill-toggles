@@ -1,7 +1,7 @@
 {
   "name": "dsh-skill-toggles",
-  "version": "0.6.0",
-  "description": "DeepSeek Harness skill toggles: whitelist-semantics skill on/off switches with group profiles (effective set = union over active groups) including a seeded built-in-skills group whose membership is derived from the live catalog, a composer button + floating panel, per-agent shadow skill provider with source attribution that survives filtering, and instant composer '/' menu + panel refresh on any catalog change",
+  "version": "0.6.1",
+  "description": "按分组开关 DSH 技能：生效集合 = 各启用分组的并集；带输入框面板、自带技能分组与 9 个 skill_toggles_* 工具",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -17,6 +17,7 @@
   "files": [
     "lib",
     "scripts",
+    "assets",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"
@@ -24,6 +25,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xiake-1/dsh-skill-toggles.git"
+  },
+  "homepage": "https://github.com/xiake-1/dsh-skill-toggles#readme",
+  "bugs": {
+    "url": "https://github.com/xiake-1/dsh-skill-toggles/issues"
   },
   "scripts": {
     "postuninstall": "node scripts/cleanup.mjs",
