@@ -1,6 +1,6 @@
 # dsh-skill-toggles
 
-DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**——所有技能默认可用，只有被"启用中的分组"显式禁用的才被过滤（生效黑名单 = 启用分组黑名单的并集）。全新安装、状态文件缺失或损坏都等于"全部启用"，永不出现"装上即全消失"。
+DeepSeek Harness 技能开关插件：**白名单语义 + 分组**——每个分组只负责自己启用的技能，永不禁用其它分组的技能；生效集合 = 所有"启用中分组"启用集合的**并集**（启用更多分组只会增加可用技能，两个分组不会互相冲突导致全部失效；所有分组都停用则全部技能不可用）。内置默认分组初始为"通配启用全部"，所以全新安装、状态文件缺失或损坏都等于"全部启用"，不会首次启动就"全部消失"；另有一个**初始停用**的「官方内置」分组，成员由当前目录自动判定（随安装包发布的技能），可一键整组启停。
 
 ![技能面板](assets/screenshots/panel.png)
 
@@ -23,10 +23,11 @@ DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**——所有�
 ![分组管理](assets/screenshots/groups.png)
 
 1. **打开面板**：聊天输入框工具条的「技能」按钮 → 左侧悬浮面板。
-2. **分组**：内置默认分组（初始全开、可编辑、不可删除）；可新建/重命名/删除自定义分组，每组有自己的黑名单与启用开关——切换启用状态即整组生效/失效。
-3. **技能列表**：每行开关作用于当前选中分组；支持搜索、按**来源分节**（插件包 / 用户 / 项目 / 自定义 / 其他，可折叠）与每节"全部禁用/全部启用"。技能被其它启用分组禁用时显示"被「××」禁用"徽标。
-4. **Agent 工具**：`skill_toggles_list / disable / enable / enable_all / disable_all / source_set / group_create / group_delete / group_set_active`（均带可选 `group` 参数，缺省为默认分组）。
-5. **改动生效时机**：
+2. **分组**：内置默认分组（初始通配启用全部、可编辑、不可删除）与内置**「官方内置」分组**（成员 = 随 DSH 安装包发布的技能，如官方 Office 套件 `office*`、`diagnose-windows-sandbox-acl`；**初始停用**，所以升级不会改变任何现有开关；激活它=一键启用全部自带技能，组内可逐个例外）；可新建/重命名/删除自定义分组——新建分组初始为**空白名单**（启用它不会带来任何技能，直到你在组内启用技能），也可在新建行点亮「成员＝自带技能」建一个**按来源自动判定成员**的分组；每组有自己的启用集合与启用开关，切换启用状态即整组加入/退出并集。
+3. **技能列表**：每行开关作用于当前选中分组（对默认分组而言"禁用"= 记为例外）；支持搜索、按**来源分节**（插件包 / 用户 / 项目 / 自定义 / 其他，可折叠）与每节"全部禁用/全部启用"。技能被其它启用分组救活时显示"被「××」启用"徽标；选中分组自身停用时显示"本组未启用"。
+4. **目录同步**：插件安装/卸载、bundle 启停、手改技能文件都会让宿主广播目录变更，面板与输入框 `/` 菜单**自动刷新**（无需关面板或刷新页面）；面板标题栏也有刷新按钮可强制重读。分组行的"启用 N 个"按当前真实目录计算，分组里残留的已卸载技能名不会把数字算错。
+5. **Agent 工具**：`skill_toggles_list / disable / enable / enable_all / disable_all / source_set / group_create / group_delete / group_set_active`（均带可选 `group` 参数，缺省为默认分组；`group_create` 可带 `scope:"builtin"` 建自带技能组，`list` 的行带 `builtin` 标记、分组带 `scope`）。
+6. **改动生效时机**：
 
    | 路径 | 生效时机 |
    |---|---|
@@ -35,33 +36,3 @@ DeepSeek Harness 技能开关插件：**黑名单语义 + 分组**——所有�
    | `skill` 工具 | 立即拒绝被禁用的技能 |
 
 只管 skills，不做 MCP 开关。
-
-## 已知限制
-
-- Agent 未激活的冷会话由 preset 常驻 scope 供数，其 `/` 菜单可能仍显示已禁用技能，直到会话被激活（模型目录与 `skill` 工具不受影响）。
-- 与旧插件 `dsh-skills-mcp-group-manager` **互斥**（两个影子 provider 叠加语义不可控），启动时检测到会打警告。
-- 重装/升级**已安装** bundle 后，宿主半需要重启进程才换代码（Node 模块缓存）；浏览器半无此问题。
-
-## 实现要点（维护者）
-
-- 状态（v2）：`<DSH_HOME>/dsh-skill-toggles/state.json`，形如 `{ version:2, groups:[{id,name,disabled[]}], activeGroups[] }`；原子写；损坏回退为"全部启用"；v1 扁平文档加载时自动迁移进默认分组。
-- 过滤机制：per-agent 影子 skill provider（`skill-toggles-filter`，注册在 agent 层）。`list()` 只发射"生效黑名单 ∧ 真实存在"的条目，invocation 改写为 `{modelInvocable:false, userInvocable:false}`，`rank:0` 在同层内直接胜出（文件系统根 rank 100..500）；启用的技能不重发，保留原 provider 的 `path` 预览与正文加载。
-- 变更后 `control.invalidate()` 清空 skill registry 的 collect 缓存，再对每个活动会话 `emit('agent-preset/selected')` 使浏览器半目录缓存失效。
-- 宿主半 `apply()` 保持同步（Cordis 对 prototype-bearing 函数的处理决定，异步 apply 会导致进程崩溃）。
-
-## 开发
-
-```
-node test/state.test.mjs   # 纯逻辑 + 存储往返测试
-```
-
-```
-dsh-skill-toggles/
-├── lib/index.js        宿主半（影子 provider、RPC、9 个工具、事件广播）
-├── lib/client.js       浏览器半（输入框按钮 + 分组管理悬浮面板）
-├── lib/state.js        纯状态逻辑（分组黑名单语义 + v1 迁移，单测覆盖）
-├── lib/store.js        原子写状态存储
-├── scripts/cleanup.mjs postuninstall 清理
-├── cordis.patch.yml    安装到 profile 的配置补丁片段
-└── test/state.test.mjs
-```
